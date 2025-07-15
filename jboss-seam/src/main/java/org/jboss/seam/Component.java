@@ -50,6 +50,7 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javassist.util.proxy.MethodFilter;
 import javassist.util.proxy.MethodHandler;
@@ -1957,7 +1958,7 @@ public class Component extends Model
       {
          throw new IllegalStateException("No application context active");
       }
-      return (Component) Contexts.getApplicationContext().get( name + ".component" );
+      return (Component) Contexts.getApplicationContext().get( (name + ".component").intern() );
    }
 
    public static Object getInstance(Class<?> clazz)
@@ -2064,6 +2065,8 @@ public class Component extends Model
       return getInstanceFromFactory(name, null);
    }
 
+   private static final Map<String, Object> cachedObjects = new ConcurrentHashMap<String, Object>();
+
    private static Object getInstanceFromFactory(String name, ScopeType scope)
    {
       Init init = Init.instance();
@@ -2111,10 +2114,15 @@ public class Component extends Model
               // Only one factory instance can access result scope
               // CONVERSATION / EVENT / PAGE anyway due to
               // the locking of the conversation.
-              synchronized (factoryMethod)
-              {
-                 return createInstanceFromFactory(name, scope, factoryMethod, factory);
-              }
+//               if (scopeResult == APPLICATION || scopeResult == STATELESS || scopeResult == UNSPECIFIED) {
+                  return cachedObjects.computeIfAbsent(name, n -> createInstanceFromFactory(name, scope, factoryMethod, factory));
+//               } else {
+//                  synchronized (factoryMethod)
+//                  {
+//                     return createInstanceFromFactory(name, scope, factoryMethod, factory);
+//                  }
+//
+//               }
             }
             else
             {
@@ -2498,7 +2506,7 @@ public class Component extends Model
       factory.setSuperclass( (type==JAVA_BEAN || noInterfaceView) ? beanClass : Object.class );
       factory.setInterfaces( interfaces.toArray( new Class[0] ) );
       factory.setFilter(FINALIZE_FILTER);
-      return factory.createClass();
+      return (Class<ProxyObject>) factory.createClass();
    }
 
    private static final MethodFilter FINALIZE_FILTER = new MethodFilter() 

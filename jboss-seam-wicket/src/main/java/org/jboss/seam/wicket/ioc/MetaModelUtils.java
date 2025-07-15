@@ -46,7 +46,7 @@ public class MetaModelUtils
       {
          factory.setSuperclass( beanClass );
       }
-      return factory.createClass();
+      return (Class<ProxyObject>) factory.createClass();
    }
 
 }

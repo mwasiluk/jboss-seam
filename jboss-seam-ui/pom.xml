@@ -3,7 +3,7 @@
     <parent>
         <artifactId>jboss-seam-parent</artifactId>
         <groupId>org.jboss.seam</groupId>
-        <version>2.3.3-SNAPSHOT</version>
+        <version>2.3.5-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>jboss-seam-ui</artifactId>
@@ -12,47 +12,47 @@
     <build>
         <!-- 		<finalName>jboss-seam-ui</finalName> -->
         <plugins>
-            <plugin>
-                <groupId>org.richfaces.cdk</groupId>
-                <artifactId>maven-cdk-plugin</artifactId>
-                <version>${version.richfaces.cdk}</version>
-                <executions>
-                    <execution>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>generate</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <library>
-                        <prefix>org.jboss.seam.ui</prefix>
-                        <description>JSF controls for JBoss Seam</description>
-                        <!-- This is configured now in java-package.info file in UI component package -->
-                        <!-- 						<taglib> -->
-                        <!-- 							<displayName>JBoss Seam UI</displayName> -->
-                        <!-- 							<shortName>s</shortName> -->
-                        <!-- 							<uri>http://jboss.org/schema/seam/taglib</uri> -->
-                        <!-- 							<tlibVersion>2.0</tlibVersion> -->
-                        <!-- 							<jspVersion>2.1</jspVersion> -->
-                        <!-- 						</taglib> -->
-                    </library>
-                </configuration>
-            </plugin>
+<!--            <plugin>-->
+<!--                <groupId>org.richfaces.cdk</groupId>-->
+<!--                <artifactId>maven-cdk-plugin</artifactId>-->
+<!--                <version>${version.richfaces.cdk}</version>-->
+<!--                <executions>-->
+<!--                    <execution>-->
+<!--                        <phase>generate-sources</phase>-->
+<!--                        <goals>-->
+<!--                            <goal>generate</goal>-->
+<!--                        </goals>-->
+<!--                    </execution>-->
+<!--                </executions>-->
+<!--                <configuration>-->
+<!--                    <library>-->
+<!--                        <prefix>org.jboss.seam.ui</prefix>-->
+<!--                        <description>JSF controls for JBoss Seam</description>-->
+<!--                        &lt;!&ndash; This is configured now in java-package.info file in UI component package &ndash;&gt;-->
+<!--                        &lt;!&ndash; 						<taglib> &ndash;&gt;-->
+<!--                        &lt;!&ndash; 							<displayName>JBoss Seam UI</displayName> &ndash;&gt;-->
+<!--                        &lt;!&ndash; 							<shortName>s</shortName> &ndash;&gt;-->
+<!--                        &lt;!&ndash; 							<uri>http://jboss.org/schema/seam/taglib</uri> &ndash;&gt;-->
+<!--                        &lt;!&ndash; 							<tlibVersion>2.0</tlibVersion> &ndash;&gt;-->
+<!--                        &lt;!&ndash; 							<jspVersion>2.1</jspVersion> &ndash;&gt;-->
+<!--                        &lt;!&ndash; 						</taglib> &ndash;&gt;-->
+<!--                    </library>-->
+<!--                </configuration>-->
+<!--            </plugin>-->
             <!-- This need to be after Richfaces CDK plugin -->
-            <plugin>
-               <groupId>org.jboss.seam</groupId>
-               <artifactId>seam-cdk-helper</artifactId>
-               <version>1.0.1</version>
-               <executions>
-                  <execution>
-                     <phase>generate-sources</phase>
-                     <goals>
-                        <goal>execute</goal>
-                     </goals>
-                  </execution>
-               </executions>
-            </plugin> 
+<!--            <plugin>-->
+<!--               <groupId>org.jboss.seam</groupId>-->
+<!--               <artifactId>seam-cdk-helper</artifactId>-->
+<!--               <version>1.0.1</version>-->
+<!--               <executions>-->
+<!--                  <execution>-->
+<!--                     <phase>generate-sources</phase>-->
+<!--                     <goals>-->
+<!--                        <goal>execute</goal>-->
+<!--                     </goals>-->
+<!--                  </execution>-->
+<!--               </executions>-->
+<!--            </plugin> -->
             <plugin>
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <configuration>
