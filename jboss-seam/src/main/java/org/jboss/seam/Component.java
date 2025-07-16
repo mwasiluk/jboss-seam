@@ -50,6 +50,10 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 
 import javassist.util.proxy.MethodFilter;
 import javassist.util.proxy.MethodHandler;
@@ -1957,7 +1961,7 @@ public class Component extends Model
       {
          throw new IllegalStateException("No application context active");
       }
-      return (Component) Contexts.getApplicationContext().get( name + ".component" );
+      return (Component) Contexts.getApplicationContext().get( (name + ".component").intern() );
    }
 
    public static Object getInstance(Class<?> clazz)
@@ -2064,7 +2068,9 @@ public class Component extends Model
       return getInstanceFromFactory(name, null);
    }
 
-   private static Object getInstanceFromFactory(String name, ScopeType scope)
+   private static ConcurrentHashMap<String, FutureTask<Object>> applicationInstanceObjects = new ConcurrentHashMap<String, FutureTask<Object>>();
+
+   private static Object getInstanceFromFactory(final String name, final ScopeType scope)
    {
       Init init = Init.instance();
       if (init == null) // for unit tests, yew!
@@ -2073,7 +2079,7 @@ public class Component extends Model
       }
       else
       {
-         Init.FactoryMethod factoryMethod = init.getFactory(name);
+         final Init.FactoryMethod factoryMethod = init.getFactory(name);
          Init.FactoryExpression methodBinding = init.getFactoryMethodExpression(name);
          Init.FactoryExpression valueBinding = init.getFactoryValueExpression(name);
          if (methodBinding != null && getOutScope(methodBinding.getScope(), null).isContextActive())
@@ -2088,7 +2094,7 @@ public class Component extends Model
          }
          else if (factoryMethod != null && getOutScope(factoryMethod.getScope(), factoryMethod.getComponent()).isContextActive())
          {
-            Object factory = Component.getInstance(factoryMethod.getComponent().getName(), true);
+            final Object factory = Component.getInstance(factoryMethod.getComponent().getName(), true);
             ScopeType scopeResult = getOutScope(factoryMethod.getScope(), factoryMethod.getComponent());
             ScopeType scopeFactory = factoryMethod.getComponent().getScope();
             // we need this lock in the following cases: (1) the target scope is
@@ -2111,10 +2117,27 @@ public class Component extends Model
               // Only one factory instance can access result scope
               // CONVERSATION / EVENT / PAGE anyway due to
               // the locking of the conversation.
-              synchronized (factoryMethod)
-              {
-                 return createInstanceFromFactory(name, scope, factoryMethod, factory);
-              }
+
+               FutureTask<Object> instance = applicationInstanceObjects.get(name);
+               if (instance == null) {
+                  FutureTask<Object> newTask = new FutureTask<Object>(new Callable<Object>() {
+                     public Object call() {
+                        return createInstanceFromFactory(name, scope, factoryMethod, factory);
+                     }
+                  });
+                  FutureTask<Object> maybeAlreadyExistsTask = applicationInstanceObjects.putIfAbsent(name, newTask);
+                  if (maybeAlreadyExistsTask == null) {
+                     instance = newTask;
+                     instance.run(); // Tylko jeden wątek to zrobi
+                  }
+               }
+                try {
+                    return instance.get();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                } catch (ExecutionException e) {
+                    throw (RuntimeException) e.getCause();
+                }
             }
             else
             {

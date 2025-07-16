@@ -45,30 +45,30 @@
    				    </suiteXmlFiles>
    				</configuration>
             </plugin>
-            <plugin>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <configuration>
-                    <links>
-                        <link>http://docs.oracle.com/javase/6/docs/api/</link>
-                    </links>
-                    <keywords>true</keywords>
-                    <author>true</author>
-                    <stylesheetfile>jdstyle.css</stylesheetfile>
-                    <doctitle>JBoss Seam ${project.name} API ${project.version}</doctitle> <!-- Used by javadoc:javadoc goal -->
-                    <detectOfflineLinks>false</detectOfflineLinks>
-					<additionalparam>-Xdoclint:none</additionalparam>
-					<failOnError>false</failOnError>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>attach-javadocs</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
-             </plugin>
+<!--            <plugin>-->
+<!--                <artifactId>maven-javadoc-plugin</artifactId>-->
+<!--                <configuration>-->
+<!--                    <links>-->
+<!--                        <link>http://docs.oracle.com/javase/6/docs/api/</link>-->
+<!--                    </links>-->
+<!--                    <keywords>true</keywords>-->
+<!--                    <author>true</author>-->
+<!--                    <stylesheetfile>jdstyle.css</stylesheetfile>-->
+<!--                    <doctitle>JBoss Seam ${project.name} API ${project.version}</doctitle> &lt;!&ndash; Used by javadoc:javadoc goal &ndash;&gt;-->
+<!--                    <detectOfflineLinks>false</detectOfflineLinks>-->
+<!--					<additionalparam>-Xdoclint:none</additionalparam>-->
+<!--					<failOnError>false</failOnError>-->
+<!--                </configuration>-->
+<!--                <executions>-->
+<!--                    <execution>-->
+<!--                        <id>attach-javadocs</id>-->
+<!--                        <phase>package</phase>-->
+<!--                        <goals>-->
+<!--                            <goal>jar</goal>-->
+<!--                        </goals>-->
+<!--                    </execution>-->
+<!--                </executions>-->
+<!--             </plugin>-->
 			<plugin>
 				<artifactId>maven-antrun-plugin</artifactId>
 <!-- 				<version>1.6</version> -->
