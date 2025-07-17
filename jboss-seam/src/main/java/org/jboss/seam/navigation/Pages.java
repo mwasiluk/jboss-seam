@@ -18,6 +18,7 @@ import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.faces.application.FacesMessage;
 import javax.faces.application.FacesMessage.Severity;
@@ -67,7 +68,7 @@ import org.jboss.seam.web.Parameters;
 /**
  * Holds metadata for pages defined in pages.xml, including
  * page actions and page descriptions.
- * 
+ *
  * @author Gavin King
  */
 @Scope(ScopeType.APPLICATION)
@@ -76,23 +77,23 @@ import org.jboss.seam.web.Parameters;
 @Install(precedence=BUILT_IN, classDependencies="javax.faces.context.FacesContext")
 @Startup
 public class Pages
-{   
+{
    private static final LogProvider log = Logging.getLogProvider(Pages.class);
 
    private ValueExpression<String> noConversationViewId;
    private String loginViewId;
-     
+
    private Integer httpPort;
    private Integer httpsPort;
-   
-   private Map<String, Page> pagesByViewId;  
-   private Map<String, List<Page>> pageStacksByViewId;   
-   private Map<String, ConversationIdParameter> conversations;    
-   
+
+   private ConcurrentHashMap<String, Page> pagesByViewId;
+   private ConcurrentHashMap<String, List<Page>> pageStacksByViewId;
+   private ConcurrentHashMap<String, ConversationIdParameter> conversations;
+
    private String[] resources = { "/WEB-INF/pages.xml" };
- 
-   private SortedSet<String> wildcardViewIds = new TreeSet<String>( 
-         new Comparator<String>() 
+
+   private SortedSet<String> wildcardViewIds = new TreeSet<String>(
+         new Comparator<String>()
          {
             public int compare(String x, String y)
             {
@@ -100,7 +101,7 @@ public class Pages
                if ( x.length()> y.length() ) return 1;
                return x.compareTo(y);
             }
-         } 
+         }
       );
 
    @Create
@@ -115,24 +116,24 @@ public class Pages
           initialize();
       }
    }
-   
-   
-   
+
+
+
    public void initialize()
    {
        initialize(null);
    }
-   
+
    public void initialize(Set<FileDescriptor> fileNames)
    {
-      pagesByViewId = Collections.synchronizedMap(new HashMap<String, Page>());   
-      pageStacksByViewId = Collections.synchronizedMap(new HashMap<String, List<Page>>());   
-      conversations = Collections.synchronizedMap(new HashMap<String, ConversationIdParameter>());
+      pagesByViewId = new ConcurrentHashMap<String, Page>();
+      pageStacksByViewId = new ConcurrentHashMap<String, List<Page>>();
+      conversations = new ConcurrentHashMap<String, ConversationIdParameter>();
 
-      for (String resource: resources) 
+      for (String resource: resources)
       {
-         InputStream stream = ResourceLoader.instance().getResourceAsStream(resource);      
-         if (stream==null) 
+         InputStream stream = ResourceLoader.instance().getResourceAsStream(resource);
+         if (stream==null)
          {
             log.debug("no pages.xml file found: " + resource);
          } else {
@@ -144,20 +145,20 @@ public class Pages
             }
          }
       }
-      
+
       if (fileNames != null)
       {
           parsePages(fileNames);
       }
    }
-   
+
    private void parsePages(Set<FileDescriptor> files)
    {
-      for (FileDescriptor file : files)  
+      for (FileDescriptor file : files)
       {
          String fileName = file.getName();
          String viewId = "/" + fileName.substring(0,fileName.length()-".page.xml".length()) + ".xhtml"; // needs more here
-         
+
          InputStream stream = null;
          try
          {
@@ -167,7 +168,7 @@ public class Pages
          {
             // No-op
          }
-         if (stream != null) 
+         if (stream != null)
          {
             log.debug("reading pages.xml file: " + fileName);
             try {
@@ -175,13 +176,13 @@ public class Pages
             } finally {
                 Resources.closeStream(stream);
             }
-         } 
+         }
      }
    }
-   
+
    /**
     * Run any navigation rule defined in pages.xml
-    * 
+    *
     * @param actionExpression the action method binding expression
     * @param actionOutcomeValue the outcome of the action method
     * @return true if a navigation rule was found
@@ -200,69 +201,54 @@ public class Pages
             {
                navigation = page.getDefaultNavigation();
             }
-            
-            if ( navigation!=null && navigation.navigate(context, actionOutcomeValue) ) return true;  
-            
+
+            if ( navigation!=null && navigation.navigate(context, actionOutcomeValue) ) return true;
+
          }
       }
       return false;
    }
    /**
     * Get the Page object for the given view id.
-    * 
+    *
     * @param viewId a JSF view id
     */
-   public Page getPage(String viewId)
-   {
-      if (viewId==null)
-      {
-         //for tests
-         return new Page(viewId);
+   public Page getPage(String viewId) {
+      if (viewId == null) {
+         return new Page(viewId); // for tests
       }
-      else
-      {
-         Page result = getCachedPage(viewId);
-         if (result==null)
-         {
-            return createPage(viewId);
-         }
-         else
-         {
-            return result;
-         }
+
+      Page existing = pagesByViewId.get(viewId);
+      if (existing != null) {
+         return existing;
       }
+
+      Page newPage = new Page(viewId);
+      Page previous = pagesByViewId.putIfAbsent(viewId, newPage);
+      return previous != null ? previous : newPage;
    }
-   
+
    /**
-    * Create a new default Page object for a JSF view id
-    */
-   private Page createPage(String viewId)
-   {
-      Page result = new Page(viewId);
-      pagesByViewId.put(viewId, result);
-      return result;
-   }
-   
-   private Page getCachedPage(String viewId)
-   {
-      return pagesByViewId.get(viewId);
-   }
-   
-   /**
-    * Get the stack of Page objects, from least specific to 
+    * Get the stack of Page objects, from least specific to
     * most specific, that match the given view id.
-    * 
+    *
     * @param viewId a JSF view id
     */
-   protected List<Page> getPageStack(String viewId)
-   {
-      List<Page> stack = pageStacksByViewId.get(viewId);
-      if (stack==null)
-      {
-         stack = createPageStack(viewId);
-         pageStacksByViewId.put(viewId, stack);
-      }
-      return stack;
+   protected List<Page> getPageStack(String viewId) {
+
+         if (viewId==null)
+         {
+            //for tests
+            return new ArrayList<Page>();
+         }
+       List<Page> existing = pageStacksByViewId.get(viewId);
+       if (existing != null) {
+           return existing;
+       }
+
+       List<Page> newStack = createPageStack(viewId);
+       List<Page> previous = pageStacksByViewId.putIfAbsent(viewId, newStack);
+       return previous != null ? previous : newStack;
    }
    /**
     * Create the stack of pages that match a JSF view id
@@ -284,18 +270,18 @@ public class Pages
       if (page!=null) stack.add(page);
       return stack;
    }
-   
+
    /**
-    * Call page actions, check permissions and validate the existence 
-    * of a conversation for pages which require a long-running 
-    * conversation, starting with the most general view id, ending at 
+    * Call page actions, check permissions and validate the existence
+    * of a conversation for pages which require a long-running
+    * conversation, starting with the most general view id, ending at
     * the most specific. Also perform redirection to the required
     * scheme if necessary.
     */
    public boolean preRender(FacesContext facesContext)
    {
       String viewId = getViewId(facesContext);
-      
+
       //redirect to HTTPS if necessary
       String requestScheme = getRequestScheme(facesContext);
       if ( requestScheme!=null )
@@ -307,7 +293,7 @@ public class Pages
             return false;
          }
       }
-      
+
       //apply the datamodelselection passed by s:link or s:button
       //before running any actions
       selectDataModelRow(facesContext);
@@ -315,7 +301,7 @@ public class Pages
       //redirect if necessary
       List<Page> pageStack = getPageStack(viewId);
       for ( Page page: pageStack )
-      {         
+      {
          if ( isNoConversationRedirectRequired(page) )
          {
             redirectToNoConversationView();
@@ -328,33 +314,33 @@ public class Pages
          }
       }
 
-      boolean result = callAction(facesContext); 
+      boolean result = callAction(facesContext);
 
-      //If responseComplete then we're probably doing a redirect so don't call the page actions now. 
-      if (!facesContext.getResponseComplete()) { 
-          String newViewId = getViewId(facesContext); 
+      //If responseComplete then we're probably doing a redirect so don't call the page actions now.
+      if (!facesContext.getResponseComplete()) {
+          String newViewId = getViewId(facesContext);
 
-          for ( Page page: getPageStack(newViewId) ) { 
-              if ( isNoConversationRedirectRequired(page) ) { 
-                  redirectToNoConversationView(); 
-                  return false; 
-              } else if ( isLoginRedirectRequired(newViewId, page) ) { 
-                  redirectToLoginView(); 
-                  return false; 
-              } 
-          } 
+          for ( Page page: getPageStack(newViewId) ) {
+              if ( isNoConversationRedirectRequired(page) ) {
+                  redirectToNoConversationView();
+                  return false;
+              } else if ( isLoginRedirectRequired(newViewId, page) ) {
+                  redirectToLoginView();
+                  return false;
+              }
+          }
 
-          //run the page actions, check permissions, 
-          //handle conversation begin/end 
+          //run the page actions, check permissions,
+          //handle conversation begin/end
 
-          for ( Page page: getPageStack(newViewId) ) { 
-              result = page.preRender(facesContext) || result; 
-          } 
-      } 
-      
+          for ( Page page: getPageStack(newViewId) ) {
+              result = page.preRender(facesContext) || result;
+          }
+      }
+
       return result;
    }
-   
+
    /**
     * Look for a DataModel row selection in the request parameters,
     * and apply it to the DataModel.
@@ -390,7 +376,7 @@ public class Pages
          }
       }
    }
-   
+
    /**
     * Check permissions and validate the existence of a conversation
     * for pages which require a long-running conversation, starting
@@ -399,16 +385,16 @@ public class Pages
     */
    public void postRestore(FacesContext facesContext)
    {
-      //first store the page parameters into the viewroot, so 
+      //first store the page parameters into the viewroot, so
       //that if a login redirect occurs, or if a failure
-      //occurs while validating of applying to the model, we can 
+      //occurs while validating of applying to the model, we can
       //still make Redirect.captureCurrentView() work.
       storeRequestStringValuesInPageContext(facesContext);
-      
+
       //check if we need to redirect
-      String viewId = getViewId(facesContext);      
+      String viewId = getViewId(facesContext);
       for ( Page page: getPageStack(viewId) )
-      {         
+      {
          if ( isLoginRedirectRequired(viewId, page) )
          {
             redirectToLoginView();
@@ -432,48 +418,48 @@ public class Pages
 
       //now validate the values we just stored in
       //the view root, after the redirect checking
-      if ( convertAndValidateStringValuesInPageContext(facesContext) ) 
+      if ( convertAndValidateStringValuesInPageContext(facesContext) )
       {
          Validation.instance().fail();
          //and don't apply them to the model
       }
       else
-      {   
+      {
          //finally apply page parameters to the model
          //(after checking permissions)
          applyConvertedValidatedValuesToModel(facesContext);
       }
    }
-   
+
    /**
     * Check if a login redirect is required for the current FacesContext
-    * 
+    *
     * @param facesContext The faces context containing the view ID
     * @return boolean Returns true if a login redirect is required
     */
    public boolean isLoginRedirectRequired(FacesContext facesContext)
    {
-      String viewId = getViewId(facesContext);      
+      String viewId = getViewId(facesContext);
       for ( Page page: getPageStack(viewId) )
-      {         
+      {
          if ( isLoginRedirectRequired(viewId, page) ) return true;
       }
       return false;
    }
-   
+
    private boolean isNoConversationRedirectRequired(Page page)
    {
-      return page.isConversationRequired() && 
+      return page.isConversationRequired() &&
             !Manager.instance().isLongRunningOrNestedConversation();
    }
-   
+
    private boolean isLoginRedirectRequired(String viewId, Page page)
    {
-      return page.isLoginRequired() && 
-            !viewId.equals( getLoginViewId() ) && 
+      return page.isLoginRequired() &&
+            !viewId.equals( getLoginViewId() ) &&
             !Identity.instance().isLoggedIn();
    }
-   
+
    public String getRequestScheme(FacesContext facesContext)
    {
       String requestUrl = getRequestUrl(facesContext);
@@ -487,7 +473,7 @@ public class Pages
          return idx<0 ? null : requestUrl.substring(0, idx);
       }
    }
-   
+
    public String encodeScheme(String viewId, FacesContext context, String url)
    {
       String scheme = getScheme(viewId);
@@ -499,12 +485,12 @@ public class Pages
             try
             {
                URL serverUrl = new URL(requestUrl);
-               
+
                StringBuilder sb = new StringBuilder();
                sb.append(scheme);
                sb.append("://");
                sb.append(serverUrl.getHost());
-               
+
                if ("http".equals(scheme) && httpPort != null)
                {
                   sb.append(":");
@@ -520,26 +506,26 @@ public class Pages
                   sb.append(":");
                   sb.append(serverUrl.getPort());
                }
-               
+
                if (!url.startsWith("/")) sb.append("/");
-               
+
                sb.append(url);
-               
+
                url = sb.toString();
             }
-            catch (MalformedURLException ex) 
+            catch (MalformedURLException ex)
             {
                throw new RuntimeException(ex);
             }
          }
       }
-      return url;   
+      return url;
    }
-   
+
    private static String getRequestUrl(FacesContext facesContext)
    {
-      Object request = facesContext.getExternalContext().getRequest(); 
-      if (request instanceof HttpServletRequest) 
+      Object request = facesContext.getExternalContext().getRequest();
+      if (request instanceof HttpServletRequest)
       {
          return ( (HttpServletRequest) request).getRequestURL().toString();
       }
@@ -548,11 +534,11 @@ public class Pages
          return null;
       }
    }
-   
+
    public void redirectToLoginView()
    {
       notLoggedIn();
-      
+
       String loginViewId = getLoginViewId();
       if (loginViewId==null)
       {
@@ -563,16 +549,16 @@ public class Pages
          Manager.instance().redirect(loginViewId);
       }
    }
-   
+
    public void redirectToNoConversationView()
    {
       noConversation();
-      
+
       //stuff from jPDL takes precedence
       org.jboss.seam.faces.FacesPage facesPage = org.jboss.seam.faces.FacesPage.instance();
       String pageflowName = facesPage.getPageflowName();
       String pageflowNodeName = facesPage.getPageflowNodeName();
-      
+
       String noConversationViewId = null;
       if (pageflowName==null || pageflowNodeName==null)
       {
@@ -583,13 +569,13 @@ public class Pages
       {
          noConversationViewId = Pageflow.instance().getNoConversationViewId(pageflowName, pageflowNodeName);
       }
-      
+
       if (noConversationViewId!=null)
       {
          Manager.instance().redirect(noConversationViewId);
       }
    }
-   
+
    public String getScheme(String viewId)
    {
       List<Page> stack = getPageStack(viewId);
@@ -621,15 +607,15 @@ public class Pages
    {
       return Interpolator.instance().interpolate( getDescription(viewId) );
    }
-   
+
    protected void noConversation()
    {
       Events.instance().raiseEvent("org.jboss.seam.noConversation");
-      
-      FacesMessages.instance().addFromResourceBundleOrDefault( 
-            StatusMessage.Severity.WARN, 
-            "org.jboss.seam.NoConversation", 
-            "The conversation ended, timed out or was processing another request" 
+
+      FacesMessages.instance().addFromResourceBundleOrDefault(
+            StatusMessage.Severity.WARN,
+            "org.jboss.seam.NoConversation",
+            "The conversation ended, timed out or was processing another request"
          );
    }
 
@@ -644,7 +630,7 @@ public class Pages
    {
       return returnValue == null ? null : returnValue.toString();
    }
-   
+
    /**
     * Call the JSF navigation handler
     */
@@ -653,11 +639,11 @@ public class Pages
       facesContext.getApplication().getNavigationHandler()
             .handleNavigation(facesContext, fromAction, outcome);
       //after every time that the view may have changed,
-      //we need to flush the page context, since the 
+      //we need to flush the page context, since the
       //attribute map is being discarder
       Contexts.getPageContext().flush();
    }
-   
+
    public static Pages instance()
    {
       if ( !Contexts.isApplicationContextActive() )
@@ -666,7 +652,7 @@ public class Pages
       }
       return (Pages) Component.getInstance(Pages.class, ScopeType.APPLICATION);
    }
-   
+
    /**
     * Call the action requested by s:link or s:button.
     */
@@ -674,9 +660,9 @@ public class Pages
    private static boolean callAction(FacesContext facesContext)
    {
       //TODO: refactor with Pages.instance().callAction()!!
-      
+
       boolean result = false;
-      
+
       String outcome = facesContext.getExternalContext()
             .getRequestParameterMap().get("actionOutcome");
       String fromAction = outcome;
@@ -690,7 +676,7 @@ public class Pages
       if (decodedOutcome != null && (decodedOutcome.indexOf('#') >= 0 || decodedOutcome.indexOf('{') >= 0) ){
          throw new IllegalArgumentException("EL expressions are not allowed in actionOutcome parameter");
       }
-      
+
       if (outcome==null)
       {
          String actionId = facesContext.getExternalContext()
@@ -714,10 +700,10 @@ public class Pages
       {
          handleOutcome(facesContext, outcome, fromAction);
       }
-      
+
       return result;
    }
-   
+
    /**
     * Build a list of page-scoped resource bundles, from most
     * specific view id, to most general.
@@ -734,11 +720,11 @@ public class Pages
       }
       return result;
    }
-   
+
    /**
     * Get the values of any page parameters by evaluating the value bindings
     * against the model and converting to String.
-    * 
+    *
     * @param viewId the JSF view id
     * @param overridden excluded parameters
     * @return a map of page parameter name to String value
@@ -754,7 +740,7 @@ public class Pages
             {
                String value = null;
                if ( pageParameter.getValueExpression()==null )
-               {                  
+               {
                   if (Contexts.isPageContextActive()) {
                       value = (String) Contexts.getPageContext().get(pageParameter.getName());
                   }
@@ -763,7 +749,7 @@ public class Pages
                {
                   value = pageParameter.getStringValueFromModel(facesContext);
                }
-               if (value!=null) 
+               if (value!=null)
                {
                   parameters.put( pageParameter.getName(), value );
                }
@@ -772,7 +758,7 @@ public class Pages
       }
       return parameters;
    }
-   
+
    private void storeRequestStringValuesInPageContext(FacesContext facesContext)
    {
       Parameters parameters = Parameters.instance();
@@ -800,7 +786,7 @@ public class Pages
          }
       }
    }
-   
+
    /**
     * Convert and validate page parameters passed as view root attributes or request parameters
     */
@@ -810,7 +796,7 @@ public class Pages
       for ( Page page: getPageStack( getViewId(facesContext) ) )
       {
          for ( Param pageParameter: page.getParameters() )
-         {  
+         {
             try
             {
                String value = (String) Contexts.getPageContext().get( pageParameter.getName() );
@@ -827,7 +813,7 @@ public class Pages
                {
                   facesContext.addMessage(null, ve.getFacesMessage());
                }
-               
+
                validationFailed = true;
             }
             catch (ConverterException ce)
@@ -842,7 +828,7 @@ public class Pages
       }
       return validationFailed;
    }
-   
+
    /**
     * Apply page parameters passed as view root attributes or request parameters to the model
     */
@@ -852,7 +838,7 @@ public class Pages
       for ( Page page: getPageStack(viewId) )
       {
          for ( Param pageParameter: page.getParameters() )
-         {         
+         {
             ValueExpression valueExpression = pageParameter.getValueExpression();
             if (valueExpression!=null)
             {
@@ -887,7 +873,7 @@ public class Pages
       }
       return parameters;
    }
-   
+
    /**
     * Update the page parameter values stored in the PAGE context with the current
     * values of the mapped attributes of the model
@@ -913,10 +899,10 @@ public class Pages
          }
       }
    }
-   
+
    /**
     * Encode page parameters into a URL
-    * 
+    *
     * @param url the base URL
     * @param viewId the JSF view id of the page
     * @return the URL with parameters appended
@@ -925,10 +911,10 @@ public class Pages
    {
       return encodePageParameters(facesContext, url, viewId, Collections.EMPTY_SET);
    }
-   
+
    /**
     * Encode page parameters into a URL
-    * 
+    *
     * @param url the base URL
     * @param viewId the JSF view id of the page
     * @param overridden excluded parameters
@@ -939,10 +925,10 @@ public class Pages
       Map<String, Object> parameters = getStringValuesFromModel(facesContext, viewId, overridden);
       return Manager.instance().encodeParameters(url, parameters);
    }
-   
+
    /**
     * Search for a defined no-conversation-view-id, beginning with
-    * the most specific view id, then wildcarded view ids, and 
+    * the most specific view id, then wildcarded view ids, and
     * finally the global setting
     */
    public String getNoConversationViewId(String viewId)
@@ -962,10 +948,10 @@ public class Pages
       }
       return this.noConversationViewId != null ? this.noConversationViewId.getValue() : null;
    }
-   
+
    /**
     * Search for a defined conversation timeout, beginning with
-    * the most specific view id, then wildcarded view ids, and 
+    * the most specific view id, then wildcarded view ids, and
     * finally the global setting from Manager
     */
    public Integer getTimeout(String viewId)
@@ -982,10 +968,10 @@ public class Pages
       }
       return Manager.instance().getConversationTimeout();
    }
-   
+
    /**
     * Search for a defined concurrent request timeout, beginning with
-    * the most specific view id, then wildcarded view ids, and 
+    * the most specific view id, then wildcarded view ids, and
     * finally the global setting from Manager
     */
    public Integer getConcurrentRequestTimeout(String viewId)
@@ -1002,14 +988,14 @@ public class Pages
       }
       return Manager.instance().getConcurrentRequestTimeout();
    }
-   
+
    public static String getSuffix()
    {
       String defaultSuffix = FacesContext.getCurrentInstance().getExternalContext()
             .getInitParameter(ViewHandler.DEFAULT_SUFFIX_PARAM_NAME);
       return defaultSuffix == null ? ViewHandler.DEFAULT_SUFFIX : defaultSuffix;
    }
-   
+
    /**
     * Parse a pages.xml file
     */
@@ -1028,7 +1014,7 @@ public class Pages
       {
          loginViewId = root.attributeValue("login-view-id");
       }
-      
+
       if (httpPort == null)
       {
          try
@@ -1044,7 +1030,7 @@ public class Pages
             throw new IllegalStateException("Invalid value specified for http-port attribute in pages.xml");
          }
       }
-      
+
       if (httpsPort == null)
       {
          try
@@ -1060,20 +1046,20 @@ public class Pages
             throw new IllegalStateException("Invalid valid specified for https-port attribute in pages.xml");
          }
       }
-      
+
       List<Element> elements = root.elements("conversation");
       for (Element conversation : elements)
       {
          parseConversation(conversation, conversation.attributeValue("name"));
       }
-      
+
       elements = root.elements("page");
       for (Element page: elements)
       {
          parse( page, page.attributeValue("view-id") );
-      } 
+      }
    }
-   
+
    /**
     * Parse a viewId.page.xml file
     */
@@ -1081,7 +1067,7 @@ public class Pages
    {
       parse( getDocumentRoot(stream), viewId );
    }
-   
+
    /**
     * Get the root element of the document
     */
@@ -1096,26 +1082,26 @@ public class Pages
          throw new RuntimeException(de);
       }
    }
-   
+
    private void parseConversation(Element element, String name)
    {
       if (name == null)
       {
          throw new IllegalStateException("Must specify name for <conversation/> declaration");
       }
-      
+
       if (conversations.containsKey(name))
       {
          throw new IllegalStateException("<conversation/> declaration already exists for [" + name + "]");
       }
-      
-      NaturalConversationIdParameter param = new NaturalConversationIdParameter(name, 
-               element.attributeValue("parameter-name"), 
+
+      NaturalConversationIdParameter param = new NaturalConversationIdParameter(name,
+               element.attributeValue("parameter-name"),
                element.attributeValue("parameter-value"));
-      
+
       conversations.put(name, param);
    }
-   
+
    /**
     * Parse a page element and add a Page to the map
     */
@@ -1125,14 +1111,14 @@ public class Pages
       {
          throw new IllegalStateException("Must specify view-id for <page/> declaration");
       }
-      
+
       if ( viewId.endsWith("*") )
       {
          wildcardViewIds.add(viewId);
       }
       Page page = new Page(viewId);
       pagesByViewId.put(viewId, page);
-      
+
       parsePage(page, element, viewId);
       parseConversationControl( element, page.getConversationControl() );
       parseTaskControl(element, page.getTaskControl());
@@ -1142,13 +1128,13 @@ public class Pages
       {
          page.getParameters().add( parseParam(param, page.isValidateModel()) );
       }
-      
+
       List<Element> moreChildren = element.elements("navigation");
       for (Element fromAction: moreChildren)
       {
          parseActionNavigation(page, fromAction);
       }
-      
+
       Element restrict = element.element("restrict");
       if (restrict != null)
       {
@@ -1156,46 +1142,46 @@ public class Pages
          String expr = restrict.getTextTrim();
          if ( !Strings.isEmpty(expr) ) page.setRestriction(expr);
       }
-      
+
       List<Element> headers = element.elements("header");
       for (Element header: headers) {
          page.getHeaders().add(parseHeader(header));
       }
    }
-   
+
    public ConversationIdParameter getConversationIdParameter(String conversationName)
    {
       return conversations.get(conversationName);
    }
-   
+
    /**
     * Parse the attributes of page
     */
    private Page parsePage(Page page, Element element, String viewId)
    {
-      
+
       page.setSwitchEnabled( !"disabled".equals( element.attributeValue("switch") ) );
-      
+
       Element optionalElement = element.element("description");
-      String description = optionalElement==null ? 
+      String description = optionalElement==null ?
                element.getTextTrim() : optionalElement.getTextTrim();
       if (description!=null && description.length()>0)
       {
          page.setDescription(description);
       }
-      
+
       String timeoutString = element.attributeValue("timeout");
       if (timeoutString!=null)
       {
          page.setTimeout(Integer.parseInt(timeoutString));
       }
-      
+
       String concurrentRequestTimeoutString = element.attributeValue("concurrent-request-timeout");
       if (concurrentRequestTimeoutString!=null)
       {
          page.setConcurrentRequestTimeout(Integer.parseInt(concurrentRequestTimeoutString));
       }
-      
+
       String noConversationViewIdString = element.attributeValue("no-conversation-view-id");
       if (noConversationViewIdString != null)
       {
@@ -1204,27 +1190,29 @@ public class Pages
       page.setConversationRequired(Boolean.parseBoolean(element.attributeValue("conversation-required")));
       page.setLoginRequired(Boolean.parseBoolean(element.attributeValue("login-required")));
       page.setScheme(element.attributeValue("scheme"));
-      
+
       String expiresValue = element.attributeValue("expires");
       if (expiresValue != null) {
            page.setExpires(Integer.parseInt(expiresValue));
       }
-      
-      ConversationIdParameter param = conversations.get( element.attributeValue("conversation") );
-      if (param != null) page.setConversationIdParameter(param);
-      
+
+      if (element.attributeValue("conversation") != null) {
+         ConversationIdParameter param = conversations.get( element.attributeValue("conversation") );
+         if (param != null) page.setConversationIdParameter(param);
+      }
+
 
       List<Element> patterns = element.elements("rewrite");
       for (Element pattern: patterns) {
            page.addRewritePattern(pattern.attributeValue("pattern"));
       }
-      
+
       List<Element> events = element.elements("raise-event");
       for (Element eventElement : events)
       {
          page.addEventType( eventElement.attributeValue("type") );
       }
-      
+
       Action action = parseAction(element, "action", false);
       if (action!=null) page.getActions().add(action);
       List<Element> childElements = element.elements("action");
@@ -1232,7 +1220,7 @@ public class Pages
       {
          page.getActions().add( parseAction(childElement, "execute", true) );
       }
-            
+
       String bundle = element.attributeValue("bundle");
       if (bundle!=null)
       {
@@ -1258,10 +1246,10 @@ public class Pages
       {
          page.setValidateModel(Boolean.parseBoolean(validateModelStr));
       }
-      
+
       return page;
    }
-   
+
    private static Action parseAction(Element element, String actionAtt, boolean conditionalsAllowed)
    {
       Action action = new Action();
@@ -1275,7 +1263,7 @@ public class Pages
       {
          action.setOutcome(methodExpression);
       }
-      
+
       if (conditionalsAllowed)
       {
          String expression = element.attributeValue("if");
@@ -1287,9 +1275,9 @@ public class Pages
       }
       return action;
    }
-   
+
    /**
-    * Parse end-conversation (and end-task) and begin-conversation (start-task and begin-task) 
+    * Parse end-conversation (and end-task) and begin-conversation (start-task and begin-task)
     *
     */
    private static void parseConversationControl(Element element, ConversationControl control)
@@ -1307,7 +1295,7 @@ public class Pages
             control.setEndConversationCondition( Expressions.instance().createValueExpression(expression, Boolean.class) );
          }
       }
-      
+
       Element beginConversation = element.element("begin-conversation");
       beginConversation = beginConversation == null ? element.element("begin-task") : beginConversation;
       beginConversation = beginConversation == null ? element.element("start-task") : beginConversation;
@@ -1329,13 +1317,13 @@ public class Pages
             control.setBeginConversationCondition( Expressions.instance().createValueExpression(expression, Boolean.class) );
          }
       }
-      
+
       if ( control.isBeginConversation() && control.isEndConversation() )
       {
          throw new IllegalStateException("cannot use both <begin-conversation/> and <end-conversation/>");
       }
    }
-   
+
    /**
     * Parse begin-task, start-task and end-task
     */
@@ -1351,7 +1339,7 @@ public class Pages
             control.setTransition( Expressions.instance().createValueExpression(transition, String.class) );
          }
       }
-      
+
       Element beginTask = element.element("begin-task");
       if ( beginTask!=null )
       {
@@ -1363,7 +1351,7 @@ public class Pages
          }
          control.setTaskId( Expressions.instance().createValueExpression(taskId, Long.class) );
       }
-      
+
       Element startTask = element.element("start-task");
       if ( startTask!=null )
       {
@@ -1375,7 +1363,7 @@ public class Pages
          }
          control.setTaskId( Expressions.instance().createValueExpression(taskId, Long.class) );
       }
-      
+
       if ( control.isBeginTask() && control.isEndTask() )
       {
          throw new IllegalStateException("cannot use both <begin-task/> and <end-task/>");
@@ -1389,7 +1377,7 @@ public class Pages
            throw new IllegalStateException("cannot use both <start-task/> and <end-task/>");
        }
    }
-   
+
    /**
     * Parse create-process and end-process
     */
@@ -1401,7 +1389,7 @@ public class Pages
          control.setCreateProcess(true);
          control.setDefinition( createProcess.attributeValue("definition") );
       }
-      
+
       Element resumeProcess = element.element("resume-process");
       if ( resumeProcess!=null )
       {
@@ -1413,13 +1401,13 @@ public class Pages
          }
          control.setProcessId( Expressions.instance().createValueExpression(processId, Long.class) );
       }
-      
+
       if ( control.isCreateProcess() && control.isResumeProcess() )
       {
          throw new IllegalStateException("cannot use both <create-process/> and <resume-process/>");
       }
    }
-   
+
    private static void parseEvent(Element element, Rule rule)
    {
       List<Element> events = element.elements("raise-event");
@@ -1428,25 +1416,25 @@ public class Pages
          rule.addEventType( eventElement.attributeValue("type") );
       }
    }
-   
+
    /**
     * Parse navigation
     */
    private static void parseActionNavigation(Page entry, Element element)
    {
-      Navigation navigation = new Navigation(); 
+      Navigation navigation = new Navigation();
       String outcomeExpression = element.attributeValue("evaluate");
       if (outcomeExpression!=null)
       {
          navigation.setOutcome( Expressions.instance().createValueExpression(outcomeExpression) );
       }
-      
+
       List<Element> cases = element.elements("rule");
       for (Element childElement: cases)
       {
          navigation.getRules().add( parseRule(childElement) );
       }
-      
+
       Rule rule = new Rule();
       parseEvent(element, rule);
       parseNavigationHandler(element, rule);
@@ -1454,7 +1442,7 @@ public class Pages
       parseTaskControl(element, rule.getTaskControl());
       parseProcessControl(element, rule.getProcessControl());
       navigation.setRule(rule);
-      
+
       String expression = element.attributeValue("from-action");
       if (expression==null)
       {
@@ -1476,7 +1464,7 @@ public class Pages
          }
       }
    }
-   
+
    /**
     * Parse param
     */
@@ -1515,10 +1503,10 @@ public class Pages
       {
          param.setValidateModel(Boolean.parseBoolean(validateModelStr));
       }
-      
+
       return param;
    }
-   
+
    private static Header parseHeader(Element element)
    {
        Header header = new Header();
@@ -1534,33 +1522,33 @@ public class Pages
 
        return header;
    }
-   
+
    /**
     * Parse rule
     */
    private static Rule parseRule(Element element)
    {
       Rule rule = new Rule();
-      
+
       rule.setOutcomeValue( element.attributeValue("if-outcome") );
       String expression = element.attributeValue("if");
       if (expression!=null)
       {
          rule.setCondition( Expressions.instance().createValueExpression(expression)  );
       }
-      
+
       parseConversationControl( element, rule.getConversationControl() );
       parseTaskControl(element, rule.getTaskControl());
       parseProcessControl(element, rule.getProcessControl());
       parseEvent(element, rule);
       parseNavigationHandler(element, rule);
-      
+
       return rule;
    }
-   
+
    private static void parseNavigationHandler(Element element, Rule rule)
    {
-      
+
       Element render = element.element("render");
       if (render!=null)
       {
@@ -1569,12 +1557,12 @@ public class Pages
          String message = messageElement==null ? null : messageElement.getTextTrim();
          String control = messageElement==null ? null : messageElement.attributeValue("for");
          String severityName = messageElement==null ? null : messageElement.attributeValue("severity");
-         Severity severity = severityName==null ? 
-                  FacesMessage.SEVERITY_INFO : 
+         Severity severity = severityName==null ?
+                  FacesMessage.SEVERITY_INFO :
                   getFacesMessageValuesMap().get( severityName.toUpperCase() );
          rule.addNavigationHandler( new RenderNavigationHandler(stringValueExpressionFor(viewId), message, severity, control) );
       }
-      
+
       Element redirect = element.element("redirect");
       if (redirect!=null)
       {
@@ -1593,13 +1581,13 @@ public class Pages
          String control = messageElement==null ? null : messageElement.attributeValue("for");
          String message = messageElement==null ? null : messageElement.getTextTrim();
          String severityName = messageElement==null ? null : messageElement.attributeValue("severity");
-         Severity severity = severityName==null ? 
-                  FacesMessage.SEVERITY_INFO : 
+         Severity severity = severityName==null ?
+                  FacesMessage.SEVERITY_INFO :
                   getFacesMessageValuesMap().get( severityName.toUpperCase() );
-         rule.addNavigationHandler(new RedirectNavigationHandler(stringValueExpressionFor(viewId), 
+         rule.addNavigationHandler(new RedirectNavigationHandler(stringValueExpressionFor(viewId),
                stringValueExpressionFor(url), params, message, severity, control, includePageParams) );
       }
-      
+
       List<Element> childElements = element.elements("out");
       for (Element child: childElements)
       {
@@ -1617,13 +1605,13 @@ public class Pages
          }
          rule.getOutputs().add(output);
       }
-      
+
    }
-   
+
    private static ValueExpression<String> stringValueExpressionFor(String expr) {
        return (ValueExpression<String>) ((expr == null) ? expr : Expressions.instance().createValueExpression(expr, String.class));
    }
-   
+
    public static Map<String, Severity> getFacesMessageValuesMap()
    {
       Map<String, Severity> result = new HashMap<String, Severity>();
@@ -1633,42 +1621,42 @@ public class Pages
       }
       return result;
    }
-   
+
    /**
     * The global setting for no-conversation-viewid.
-    * 
+    *
     * @return a JSF view id
     */
    public ValueExpression<String> getNoConversationViewId()
    {
       return noConversationViewId;
    }
-   
+
    public void setNoConversationViewId(ValueExpression<String> noConversationViewId)
    {
       this.noConversationViewId = noConversationViewId;
    }
-   
+
    /**
     * The global setting for login-viewid.
-    * 
+    *
     * @return a JSF view id
     */
    public String getLoginViewId()
    {
       return loginViewId;
    }
-   
+
    public void setLoginViewId(String loginViewId)
    {
       this.loginViewId = loginViewId;
    }
-   
+
    public static String getCurrentViewId()
    {
       return getViewId( FacesContext.getCurrentInstance() );
    }
-   
+
    public static String getCurrentBaseName()
    {
       String viewId = getViewId(FacesContext.getCurrentInstance());
@@ -1685,9 +1673,9 @@ public class Pages
          viewId = viewId.substring(0, pos);
       }
 
-      return viewId;      
-   }   
-   
+      return viewId;
+   }
+
    public static String getViewId(FacesContext facesContext)
    {
       if (facesContext!=null)
@@ -1697,51 +1685,51 @@ public class Pages
       }
       return null;
    }
-   
+
    public Integer getHttpPort()
    {
       return httpPort;
    }
-   
+
    public void setHttpPort(Integer httpPort)
    {
       this.httpPort = httpPort;
    }
-   
+
    public Integer getHttpsPort()
    {
       return httpsPort;
    }
-   
+
    public void setHttpsPort(Integer httpsPort)
    {
       this.httpsPort = httpsPort;
    }
-   
+
    public String[] getResources()
    {
       return resources;
    }
-   
+
    public void setResources(String[] resources)
    {
       this.resources = resources;
    }
-   
+
    private static boolean isDebugPage(String viewId)
    {
       return Init.instance().isDebugPageAvailable() && viewId.startsWith("/debug.");
    }
-   
+
    public static boolean isDebugPage()
    {
       return Init.instance().isDebugPageAvailable() &&
             getCurrentViewId() != null &&
             getCurrentViewId().startsWith("/debug.");
    }
-   
+
    public Collection<String> getKnownViewIds() {
        return pagesByViewId.keySet();
    }
-   
+
 }
