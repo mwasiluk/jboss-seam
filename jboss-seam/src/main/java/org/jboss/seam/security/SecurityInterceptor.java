@@ -43,10 +43,10 @@ public class SecurityInterceptor extends AbstractInterceptor implements Serializ
       
       private String permissionTarget;
       private String permissionAction;
-      
-      private Map<String, Object> methodRestrictions;
-      private Map<Integer,Set<String>> paramRestrictions;
-      private Set<String> roleRestrictions;
+//
+//      private Map<String, Object> methodRestrictions;
+//      private Map<Integer,Set<String>> paramRestrictions;
+//      private Set<String> roleRestrictions;
             
       public void setExpression(String expression)
       {
@@ -63,47 +63,47 @@ public class SecurityInterceptor extends AbstractInterceptor implements Serializ
          this.permissionAction = action;
       }
       
-      public void addMethodRestriction(Object target, String action)
-      {
-         if (methodRestrictions == null)
-         {
-            methodRestrictions = new HashMap<String, Object>();
-         }
-         
-         methodRestrictions.put(action, target);
-      }
-      
-      public void addRoleRestriction(String role)
-      {
-         if (roleRestrictions == null)
-         {
-            roleRestrictions = new HashSet<String>();
-         }
-         
-         roleRestrictions.add(role);
-      }
-      
-      public void addParameterRestriction(int index, String action)
-      {
-         Set<String> actions = null;
-         
-         if (paramRestrictions == null)
-         {
-            paramRestrictions = new HashMap<Integer,Set<String>>();
-         }
-         
-         if (!paramRestrictions.containsKey(index))
-         {
-            actions = new HashSet<String>();
-            paramRestrictions.put(index, actions);
-         }
-         else
-         {
-            actions = paramRestrictions.get(index);
-         }
-         
-         actions.add(action);
-      }
+//      public void addMethodRestriction(Object target, String action)
+//      {
+//         if (methodRestrictions == null)
+//         {
+//            methodRestrictions = new HashMap<String, Object>();
+//         }
+//
+//         methodRestrictions.put(action, target);
+//      }
+//
+//      public void addRoleRestriction(String role)
+//      {
+//         if (roleRestrictions == null)
+//         {
+//            roleRestrictions = new HashSet<String>();
+//         }
+//
+//         roleRestrictions.add(role);
+//      }
+//
+//      public void addParameterRestriction(int index, String action)
+//      {
+//         Set<String> actions = null;
+//
+//         if (paramRestrictions == null)
+//         {
+//            paramRestrictions = new HashMap<Integer,Set<String>>();
+//         }
+//
+//         if (!paramRestrictions.containsKey(index))
+//         {
+//            actions = new HashSet<String>();
+//            paramRestrictions.put(index, actions);
+//         }
+//         else
+//         {
+//            actions = paramRestrictions.get(index);
+//         }
+//
+//         actions.add(action);
+//      }
       
       public void check(Object[] parameters)
       {
@@ -114,33 +114,33 @@ public class SecurityInterceptor extends AbstractInterceptor implements Serializ
                Identity.instance().checkRestriction(expression);
             }
             
-            if (methodRestrictions != null)
-            {
-               for (String action : methodRestrictions.keySet())
-               {
-                  Identity.instance().checkPermission(methodRestrictions.get(action), action);
-               }
-            }
-            
-            if (paramRestrictions != null)
-            {
-               for (Integer idx : paramRestrictions.keySet())
-               {
-                  Set<String> actions = paramRestrictions.get(idx);
-                  for (String action : actions) 
-                  {
-                     Identity.instance().checkPermission(parameters[idx], action);
-                  }
-               }
-            }
-            
-            if (roleRestrictions != null)
-            {
-               for (String role : roleRestrictions)
-               {
-                  Identity.instance().checkRole(role);
-               }
-            }
+//            if (methodRestrictions != null)
+//            {
+//               for (String action : methodRestrictions.keySet())
+//               {
+//                  Identity.instance().checkPermission(methodRestrictions.get(action), action);
+//               }
+//            }
+//
+//            if (paramRestrictions != null)
+//            {
+//               for (Integer idx : paramRestrictions.keySet())
+//               {
+//                  Set<String> actions = paramRestrictions.get(idx);
+//                  for (String action : actions)
+//                  {
+//                     Identity.instance().checkPermission(parameters[idx], action);
+//                  }
+//               }
+//            }
+//
+//            if (roleRestrictions != null)
+//            {
+//               for (String role : roleRestrictions)
+//               {
+//                  Identity.instance().checkRole(role);
+//               }
+//            }
             
             if (permissionTarget != null && permissionAction != null)
             {
@@ -193,65 +193,71 @@ public class SecurityInterceptor extends AbstractInterceptor implements Serializ
            }
        }
 
-       for (Annotation annotation : method.getDeclaringClass().getAnnotations()) {
-           if (annotation.annotationType().isAnnotationPresent(RoleCheck.class)) {
-               if (newRestriction == null) newRestriction = new Restriction();
-               newRestriction.addRoleRestriction(annotation.annotationType().getSimpleName().toLowerCase());
-           }
-       }
+       // WE DO NOT USE THOSE ANNOTATIONS:
 
-       for (Annotation annotation : method.getAnnotations()) {
-           if (annotation.annotationType().isAnnotationPresent(PermissionCheck.class)) {
-               PermissionCheck permissionCheck = annotation.annotationType().getAnnotation(PermissionCheck.class);
+//       for (Annotation annotation : method.getDeclaringClass().getAnnotations()) {
+//           if (annotation.annotationType().isAnnotationPresent(RoleCheck.class)) {
+//               if (newRestriction == null) newRestriction = new Restriction();
+//               newRestriction.addRoleRestriction(annotation.annotationType().getSimpleName().toLowerCase());
+//           }
+//       }
+//
+//       for (Annotation annotation : method.getAnnotations()) {
+//           if (annotation.annotationType().isAnnotationPresent(PermissionCheck.class)) {
+//               PermissionCheck permissionCheck = annotation.annotationType().getAnnotation(PermissionCheck.class);
+//
+//               Method valueMethod = null;
+//               for (Method m : annotation.annotationType().getDeclaredMethods()) {
+//                   valueMethod = m;
+//                   break;
+//               }
+//
+//               if (valueMethod != null) {
+//                   if (newRestriction == null) newRestriction = new Restriction();
+//                   Object target = valueMethod.invoke(annotation);
+//                   if (!target.equals(void.class)) {
+//                       newRestriction.addMethodRestriction(target,
+//                           getPermissionAction(permissionCheck, annotation));
+//                   }
+//               }
+//           }
+//           if (annotation.annotationType().isAnnotationPresent(RoleCheck.class)) {
+//               if (newRestriction == null) newRestriction = new Restriction();
+//               newRestriction.addRoleRestriction(annotation.annotationType().getSimpleName().toLowerCase());
+//           }
+//       }
+//
+//       for (int i = 0; i < method.getParameterAnnotations().length; i++) {
+//           Annotation[] annotations = method.getParameterAnnotations()[i];
+//           for (Annotation annotation : annotations) {
+//               if (annotation.annotationType().isAnnotationPresent(PermissionCheck.class)) {
+//                   PermissionCheck permissionCheck = annotation.annotationType().getAnnotation(PermissionCheck.class);
+//                   if (newRestriction == null) newRestriction = new Restriction();
+//                   newRestriction.addParameterRestriction(i,
+//                       getPermissionAction(permissionCheck, annotation));
+//               }
+//           }
+//       }
 
-               Method valueMethod = null;
-               for (Method m : annotation.annotationType().getDeclaredMethods()) {
-                   valueMethod = m;
-                   break;
-               }
-
-               if (valueMethod != null) {
-                   if (newRestriction == null) newRestriction = new Restriction();
-                   Object target = valueMethod.invoke(annotation);
-                   if (!target.equals(void.class)) {
-                       newRestriction.addMethodRestriction(target,
-                           getPermissionAction(permissionCheck, annotation));
-                   }
-               }
-           }
-           if (annotation.annotationType().isAnnotationPresent(RoleCheck.class)) {
-               if (newRestriction == null) newRestriction = new Restriction();
-               newRestriction.addRoleRestriction(annotation.annotationType().getSimpleName().toLowerCase());
-           }
-       }
-
-       for (int i = 0; i < method.getParameterAnnotations().length; i++) {
-           Annotation[] annotations = method.getParameterAnnotations()[i];
-           for (Annotation annotation : annotations) {
-               if (annotation.annotationType().isAnnotationPresent(PermissionCheck.class)) {
-                   PermissionCheck permissionCheck = annotation.annotationType().getAnnotation(PermissionCheck.class);
-                   if (newRestriction == null) newRestriction = new Restriction();
-                   newRestriction.addParameterRestriction(i,
-                       getPermissionAction(permissionCheck, annotation));
-               }
-           }
+       if (newRestriction == null) {
+           return null;
        }
 
        Restriction existing = restrictions.putIfAbsent(interfaceMethod, newRestriction);
        return (existing != null) ? existing : newRestriction;
    }
    
-   private String getPermissionAction(PermissionCheck check, Annotation annotation)
-   {
-      if (!"".equals(check.value()))
-      {
-         return check.value();
-      }
-      else
-      {
-         return annotation.annotationType().getSimpleName().toLowerCase();
-      }
-   }
+//   private String getPermissionAction(PermissionCheck check, Annotation annotation)
+//   {
+//      if (!"".equals(check.value()))
+//      {
+//         return check.value();
+//      }
+//      else
+//      {
+//         return annotation.annotationType().getSimpleName().toLowerCase();
+//      }
+//   }
    
    public boolean isInterceptorEnabled()
    {
