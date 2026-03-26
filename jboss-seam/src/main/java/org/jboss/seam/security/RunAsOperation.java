@@ -1,7 +1,6 @@
 package org.jboss.seam.security;
 
 import java.security.Principal;
-import java.security.acl.Group;
 
 import javax.security.auth.Subject;
 
@@ -49,7 +48,7 @@ public abstract class RunAsOperation
    
    public RunAsOperation addRole(String role)
    {
-      for ( Group sg : getSubject().getPrincipals(Group.class) )      
+      for ( SimpleGroup sg : getSubject().getPrincipals(SimpleGroup.class) )      
       {
          if ( Identity.ROLES_GROUP.equals( sg.getName() ) )
          {

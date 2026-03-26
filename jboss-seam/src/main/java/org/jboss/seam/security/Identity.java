@@ -5,7 +5,6 @@ import static org.jboss.seam.annotations.Install.BUILT_IN;
 
 import java.io.Serializable;
 import java.security.Principal;
-import java.security.acl.Group;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
@@ -373,7 +372,7 @@ public class Identity implements Serializable
       // Populate the working memory with the user's principals
       for ( Principal p : getSubject().getPrincipals() )
       {         
-         if ( !(p instanceof Group))
+         if ( !(p instanceof SimpleGroup))
          {
             if (principal == null) 
             {
@@ -443,7 +442,7 @@ public class Identity implements Serializable
       
       tryLogin();
       
-      for ( Group sg : getSubject().getPrincipals(Group.class) )      
+      for ( SimpleGroup sg : getSubject().getPrincipals(SimpleGroup.class) )      
       {
          if ( ROLES_GROUP.equals( sg.getName() ) )
          {
@@ -472,7 +471,7 @@ public class Identity implements Serializable
       }
       else
       {
-         for ( Group sg : getSubject().getPrincipals(Group.class) )      
+         for ( SimpleGroup sg : getSubject().getPrincipals(SimpleGroup.class) )      
          {
             if ( ROLES_GROUP.equals( sg.getName() ) )
             {
@@ -494,7 +493,7 @@ public class Identity implements Serializable
     */
    public void removeRole(String role)
    {     
-      for ( Group sg : getSubject().getPrincipals(Group.class) )      
+      for ( SimpleGroup sg : getSubject().getPrincipals(SimpleGroup.class) )      
       {
          if ( ROLES_GROUP.equals( sg.getName() ) )
          {

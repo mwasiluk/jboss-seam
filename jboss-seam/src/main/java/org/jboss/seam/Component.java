@@ -2498,7 +2498,9 @@ public class Component extends Model
       factory.setSuperclass( (type==JAVA_BEAN || noInterfaceView) ? beanClass : Object.class );
       factory.setInterfaces( interfaces.toArray( new Class[0] ) );
       factory.setFilter(FINALIZE_FILTER);
-      return factory.createClass();
+      @SuppressWarnings("unchecked")
+      Class<ProxyObject> proxyClass = (Class<ProxyObject>) factory.createClass();
+      return proxyClass;
    }
 
    private static final MethodFilter FINALIZE_FILTER = new MethodFilter() 

@@ -46,7 +46,9 @@ public class MetaModelUtils
       {
          factory.setSuperclass( beanClass );
       }
-      return factory.createClass();
+      @SuppressWarnings("unchecked")
+      Class<ProxyObject> proxyClass = (Class<ProxyObject>) factory.createClass();
+      return proxyClass;
    }
 
 }

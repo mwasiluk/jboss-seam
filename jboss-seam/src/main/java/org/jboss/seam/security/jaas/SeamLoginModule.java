@@ -2,7 +2,6 @@ package org.jboss.seam.security.jaas;
 
 import static org.jboss.seam.security.Identity.ROLES_GROUP;
 
-import java.security.acl.Group;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -49,9 +48,9 @@ public class SeamLoginModule implements LoginModule
    {        
       subject.getPrincipals().add(new SimplePrincipal(username));
       
-      Group roleGroup = null;
-      
-      for ( Group g : subject.getPrincipals(Group.class) )      
+      SimpleGroup roleGroup = null;
+
+      for ( SimpleGroup g : subject.getPrincipals(SimpleGroup.class) )      
       {
          if ( ROLES_GROUP.equalsIgnoreCase( g.getName() ) )
          {

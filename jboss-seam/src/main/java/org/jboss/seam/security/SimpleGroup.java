@@ -2,7 +2,6 @@ package org.jboss.seam.security;
 
 import java.io.Serializable;
 import java.security.Principal;
-import java.security.acl.Group;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashSet;
@@ -13,7 +12,7 @@ import java.util.Set;
  * 
  * @author Shane Bryzak
  */
-public class SimpleGroup implements Group, Serializable
+public class SimpleGroup implements Principal, Serializable
 {
    private static final long serialVersionUID = 5766373925836425908L;
 
@@ -47,7 +46,7 @@ public class SimpleGroup implements Group, Serializable
       {
          for (Principal m : members)
          {
-            if (m instanceof Group && ((Group) m).isMember(member))
+            if (m instanceof SimpleGroup && ((SimpleGroup) m).isMember(member))
             {
                return true;
             }
