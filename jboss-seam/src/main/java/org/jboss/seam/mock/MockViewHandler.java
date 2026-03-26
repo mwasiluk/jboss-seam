@@ -88,4 +88,10 @@ public class MockViewHandler extends ViewHandler {
 	@Override
 	public void writeState(FacesContext ctx) throws IOException {}
 
+	@Override
+	public String getWebsocketURL(FacesContext context, String channel)
+	{
+		return null;
+	}
+
 }

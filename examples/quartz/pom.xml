@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.jboss.seam.examples</groupId>
     <artifactId>quartz</artifactId>
-    <version>2.3.3.1-wildfly</version>
+    <version>2.3.3.2-myfaces2.3</version>
     <packaging>pom</packaging>
     <name>Quartz Example (EE6)</name>
     

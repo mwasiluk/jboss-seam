@@ -593,9 +593,15 @@ public class MockExternalContext extends ExternalContext
    protected String encodeURL(String url)
    {
       if (response != null) {
-         String encodedUrl = response.encodeURL(url); 
+         String encodedUrl = response.encodeURL(url);
          url = (encodedUrl != null ? encodedUrl : url);
       }
+      return url;
+   }
+
+   @Override
+   public String encodeWebsocketURL(String url)
+   {
       return url;
    }
 }
